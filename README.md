@@ -1,4 +1,4 @@
-# stickman-anim
+# stickman-animation
 
 Hand-drawn, stop-motion style **stickman animations** for explaining workflows. White line art on black (or black on white), robot stickmen for AI agents, round-head stickmen for people, and a little cyan/green for "working"/"done". Output is a looping GIF or a crisp MP4 up to 4K. It is a small Pillow toolkit, and it also ships as a [Claude skill](#install-as-an-agent-skill).
 
