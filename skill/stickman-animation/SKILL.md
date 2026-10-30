@@ -1,78 +1,125 @@
 ---
 name: stickman-animation
-description: Make hand-drawn, stop-motion style black-and-white stickman animations as GIF or MP4 video (white line art on black by default, or black on white; HD or 4K; no voiceover) that explain a workflow, process or idea - e.g. "AI agents coding", "company workflow run by agents", "people in Discord/Telegram commanding agents", "agent opens a PR and a human approves it", dev pipelines, kanban boards, step-by-step explainers. Use this skill whenever the user asks for a stickman / stick figure / stop-motion / whiteboard-style / black background animation or GIF, wants robot-stickman "AI agents" shown doing work, or wants to visualise a software or business workflow as a short looping animation, even if they don't say "skill" or name the style. Also use it for follow-up edits to such a GIF (change text, add a stage, swap characters, translate labels, use their own avatar image).
+description: Make hand-drawn, stop-motion style stickman animations as GIF or MP4 video (white line art on black by default, or black on white; HD or 4K) with optional voice narration (TTS via Gemini Charon, OpenAI, or custom endpoint) and viral animated captions (Hormozi, MrBeast, Ali Abdaal, Dev minimal, or 400+ CapCut styles burned into MP4 via FFmpeg). Use this skill whenever the user asks for stickman / stick figure / stop-motion / whiteboard-style explainer animations, wants voiceover narration or subtitles added to stick figure videos, wants robot-stickman "AI agents" shown doing work, or wants to visualise software or business workflows. Also use it for follow-up edits (change text, adjust voice, tweak caption style or position, change colors).
 ---
 
-# Stickman stop-motion animation
+# Stickman stop-motion animation with Voice & Captions
 
-Produces short looping animations (GIF or MP4, HD 1280x720 GIF by default, ~8-14 s) in one consistent visual language: jittery line art with cyan / green accents, white on black by default or black on white. The look is "someone redrew every frame by hand", which comes from re-jittering every line each frame. The workflow below is what worked repeatedly; the bundled library does the drawing so you can spend your effort on the story.
+Produces short looping animations (GIF or MP4, HD 1280x720 by default) in one consistent visual language: jittery line art with cyan/green accents, white on black by default or black on white.
 
-## Flags: output format and colour theme
+Now enhanced with **flexible TTS narration** (Gemini 3.8 Flash TTS with voice `Charon`, OpenAI, ElevenLabs, or custom REST endpoints) and **retention-engineered dynamic captions** (integrated AutoCaptions engine with 400+ CapCut and viral creator presets).
 
-Both are chosen with plain words on the script's command line (or in the `STICKMAN_FLAGS` env var). `stickman_lib` reads them when it is imported, so scripts need no extra code: call `export()` and `sheet()` and the flags decide the rest. Map what the user asks for to flags:
+---
 
-| Flag | Output |
-|---|---|
-| `gif` | GIF, 640x360 (smallest file) |
-| `gif-hd` | GIF, 1280x720 (**default**) |
-| `video-hd` | MP4, 1920x1080, looped 3x |
-| `video-4k` | MP4, 3840x2160, looped 3x |
-| `bg-black` (or `fg-white`) | white drawing on black (**default**) |
-| `bg-white` (or `fg-black`) | black drawing on white; accents are darkened so cyan/green/red stay readable |
+## 1. Voice Narration (TTS)
 
-Example: `python make_x.py video-4k bg-white`. Naming only `fg-black` implies `bg-white` and vice versa; a clashing pair (`bg-white fg-white`) stops with an error. When the user says things like "4K video", "white background", "HD gif", pick the matching flags yourself and tell them which you used. If they say nothing, use the defaults. In the script, end with the standard block (it keeps the guard that lets the multi-process renderer import the file):
-
-```python
-if __name__ == "__main__":
-    main(render, N, "x", [8, 30, 60, 90])   # writes x_sheet.png (contact sheet) and x.gif or x.mp4 per the flags
+Narration is configured via `.env` (or environment variables) without changing code:
+```env
+TTS_PROVIDER=gemini               # 'gemini' (default), 'openai', 'elevenlabs', or 'custom'
+TTS_API_KEY=your_key_here         # Your Gemini or provider API key
+TTS_MODEL=gemini-3.8-flash-tts    # Model name
+TTS_VOICE=Charon                  # Voice: Charon (default), Puck, Kore, Fenrir, Aoede
+TTS_ENDPOINT=                     # Optional custom REST endpoint URL
 ```
 
-`main()` takes the output name from the first non-flag command-line word. Rendering uses up to 4 processes on Linux; frames depend only on their number, so the result is identical.
+### Generating Voiceover:
+- **CLI**:
+  ```bash
+  stickman voice "AI agents write code, test it, and open a PR." --output speech.wav
+  ```
+- **Python**:
+  ```python
+  from stickman_anim.tts import generate_speech, get_audio_duration
+  audio_path = generate_speech("AI agents write code, test it, and open a PR.", voice="Charon")
+  duration = get_audio_duration(audio_path)
+  ```
 
-Check the contact sheet in the chosen theme: on `bg-white` idle outlines are light grey and accents are deeper, so look again for contrast. Colour names stay the same in code (`WHITE` means "ink": near-black on a light ground; `BG` is the ground), so the same script works in both themes. Never hard-code `(0,0,0)` or `(255,255,255)` in a script.
+---
 
-## Style rules (and why)
+## 2. Animated Captions & Style Presets
 
-- **Black background with white 2.6px lines (default; `bg-white` flips to black on white), round caps.** High contrast reads well as a small GIF, and a single stroke weight keeps it cohesive.
-- **Stop-motion boil.** Every primitive jitters its points by about 1.2px, seeded by the frame number. Without this it looks like vector graphics; with it, it looks hand-drawn. The library does this for you, so draw everything through `Frame`.
-- **Colour means state**: grey/dim = idle, cyan = working/active, green = done/success, red = failure (rare, only for a deliberate error beat). Colour is never decoration, so viewers learn the code in two seconds.
-- **Two kinds of characters.** AI agents are *robot-stickmen* (square head, eyes, mouth grille, antenna: `robot()`); people are *round-head stickmen* with glasses (`human()`). The contrast is what makes "human verifies the agent" legible without words.
-- **No voiceover, minimal text.** Short labels only (stage names, a typed command, "Done"). Type text in with a typewriter effect so the eye is led along.
-- **Always loop cleanly.** End on a held "all green + sparkles" beat (4-10 frames), and make the first frame the idle/blank state.
-- **No brand logos or copyrighted characters.** Label windows with plain text ("Discord", "Telegram") instead of drawing logos or mascots. If the user supplies their own picture (e.g. an agent avatar) use it as-is in a round badge; don't claim to know who it depicts.
+Captions are burned directly into MP4 videos using FFmpeg `libass` with active-word color highlights, spring-bounce scaling, and modern rounded badge backdrops.
 
-## Workflow
+### Default Caption Placement:
+- **`pos_y = 75.0`**: Positioned **75% from the top (25% from bottom)**. This keeps the central animation stage completely clear while ensuring high subtitle readability.
+- Override anytime via `--pos-y <PERCENT>` or in Python.
 
-1. **Pin down the story** in one sentence per stage (who acts, what moves, what the end state is). If the user lists steps, one step = one scene or one node. If they list nothing, pick 3-6 stages. Don't ask clarifying questions for simple requests; make a sensible version and offer tweaks afterwards.
-2. **Pick a layout pattern** from `references/patterns.md` (chat windows -> hub, stage pipeline, kanban, branch/PR graph, diff review, hub-and-spoke orchestrator, single desk scene). Reuse them; they are already tuned to 640x360.
-3. **Write a timeline first.** Define phase start frames as constants (`T_TYPE, T_SEND, T_WORK, T_DONE`...). Roughly: typing 12-16 frames, a packet flight 6-8, a stage 8-16, final hold 6-10. Total 70-120 frames at 120 ms. Everything in `render(f)` derives from `f` and those constants, so you can re-time by editing numbers.
-4. **Write the script** at `<scratch>/make_xxx.py`: `sys.path.insert(0, "<this skill>/scripts")`, `from stickman_lib import *`, define `render(f)` using `Frame(f)`, then end with the `if __name__ == "__main__": main(render, N, "x", [frames to eyeball])` block (this follows the format and theme flags). `scripts/example_demo.py` is a ~70-line template. Run scripts as `python make_x.py <flags>`.
-5. **Look before you ship.** Render, open the contact sheet with Read, and check: text isn't clipped or overlapping (typewriter frames excepted), arms don't stretch absurdly (keep hands within about 70px of the shoulder, or move the character), nothing sits on top of a label, the final frame is clean. Fix and re-render; one or two iterations is normal.
-6. **Deliver** the file with `SendUserFile` (display "render" for a GIF, "attach" for a large MP4); say which format and theme flags you used. In the reply: say what happens in 3-5 short bullets, note anything you substituted (e.g. no logos), and offer 2-3 concrete tweaks. Don't paste code.
+### Curated Style Presets:
+| Preset | Visual Description | Best For |
+|---|---|---|
+| `hormozi-bold` *(Default)* | Massive bold uppercase, vibrant electric yellow highlight (`#FFE600`), thick black outline | High retention viral explainers |
+| `mrbeast-pop` | Comic impact stroke, bright neon green highlight (`#2BF82A`), explosive energy | Engaging workflow beats |
+| `ali-abdaal-clean` | Dark rounded pill badge, sky blue highlight (`#38BDF8`), elegant typography | Educational and professional videos |
+| `dev-minimal` | Monospace terminal badge, emerald green highlight (`#10B981`) | Developer tools and code workflows |
+| `cyberpunk-neon` | Electric cyan ground, glowing neon pink highlight (`#FF0080`) | Tech and gaming workflows |
+| `karaoke-gold` | Dim inactive words swept by continuous gold wipe (`#FFD700`) | Music and steady pacing |
+| `luxury-editorial` | Champagne gold serif typography (`#D4AF37`) | High-end presentations |
+| `bold_red_accent` | Crisp white typography with crimson red highlight (`#FF2020`) | Clear punchy alerts |
 
-## Library cheat sheet (`scripts/stickman_lib.py`)
+*Run `stickman presets` or `list_presets()` to search the complete catalog of 400+ presets.*
 
-`Frame(f)` -> draw -> `.image()`. Constants: `WHITE GREY DIM CYAN GREEN RED`, canvas `W,H = 640,360`.
+---
 
-- Primitives: `line poly rect circle dashed text typed wipe`; `font(size, bangla=False)`
-- Icons: `spinner check cross sparkle packet floor`
-- Characters: `robot(cx, floor_y, eye, hl, hr, cheer)`, `human(cx, floor_y, hl, hr, thumbs_up, smile)`; `hl/hr` are absolute hand targets, `None` = idle arm; use `c.wig` for typing wobble
-- Furniture: `window(a, b, title)`, `node(center, w, h, label, state)`, `avatar(PIL_image, center, radius)` + `load_avatar(path)`
-- Motion helpers: `lerp clamp arc_lerp along`
-- Flags: `FORMAT`, `THEME`, `describe()`; `main(render, n, name, sheet_frames)` for the standard script ending, or `export(render, n, base, ms, workers=)` and `sheet(render, idxs, path)` separately; `iter_frames(render, n, workers)`
-- Resolution (only for manual overrides; the format flag already sets it): `set_quality("sd"|"hd"|"fhd"|"4k")`
-- Output: `save_gif(frames, path, ms=120, colors=64)`, `save_mp4(frames, path, ms=120)` / `render_mp4(render, n, path, ms=120)` (crisp video; use `render_mp4` at 4K, `export()` already does), `contact_sheet(frames, idxs, path)`
+## 3. One-Call Voiced & Captioned Animation Workflow
 
-## Gotchas learned the hard way
+The quickest way to render a fully voiced, synchronized, and captioned animation is `export_with_voice`:
 
-- **Bangla / non-Latin text**: use `font(size, bangla=True)` (FreeSans, shaped through raqm) and reveal with `wipe()`, not character slicing, because slicing breaks conjuncts. Split long lines in two; about 30 glyphs at 50px fills the width. Translate faithfully and mention the translation in the reply.
-- Typewriter on a centered title: compute position from the *full* string so the text doesn't slide as it grows.
-- Parallel actors look alive when **staggered** (offset each by 8-24 frames); synchronous ones look robotic.
-- Use `f % 2` alternation for typing hands, and a one-frame blink every ~14 frames; tiny details sell "alive".
-- Keep per-frame draw calls modest (<~600 primitives); 100+ frames render in a few seconds at S=2. If a scene is dense, drop `S` to 1.5 rather than cutting content.
-- GIF palette: stay with the fixed palette above; extra greys add file size without adding clarity. 1-3 MB is normal.
-- **Resolution**: layouts are always authored on a 640x360 logical canvas; `set_quality()` only changes how many pixels draw it, so the same coordinates stay sharp at any size. Default is **HD 1280x720** (supersampled 4x, then downsampled, so edges are anti-aliased). Presets: `sd` 640x360 (~0.7 MB, only if the user needs a tiny file), `hd` 1280x720 (~2-7 MB), `fhd` 1920x1080 (~3-12 MB), `4k` 3840x2160. Rendering time grows with resolution (HD ~20 s for 130 frames, FHD roughly 2-3x). If the user asks for "higher resolution", "sharper", "HD", "full HD" or "4K", call `set_quality` with that preset; no layout changes needed.
-- **GIF vs MP4**: GIFs are capped at 256 colours and get heavy at FHD/4K. `save_gif` already uses a 64-colour palette with no dithering, which suits this black/white/cyan/green art. When the user wants the sharpest result, for a video edit or a social post, also write `save_mp4(frames, path, ms)` (H.264, 3 loops, 30 fps) and send both. For 4K, deliver an MP4 (or a PNG still) rather than a GIF. At 4K never keep all frames in a list (about 25 MB each, it gets the process killed): call `set_quality("4k")` then `render_mp4(render, N, "out.mp4", 120)`, which streams frames into ffmpeg and loops the clip 3x. A 140-frame 4K clip takes about 2.5 minutes and gives a ~13 MB file.
-- **4K stills for a video frame**: `set_quality("4k")`, build one `Frame(37)` (any fixed number gives the same jitter) and `c.image().save("frame.png")`. Keep the frame number fixed so re-renders match.
-- Look at the contact sheet (it is downscaled to 640 px per tile, so it stays small however high the render resolution is) and, at least once, crop a region of a full-resolution frame to check text edges.
-- If you can't find fonts, `find_font()` falls back to DejaVu; check `fc-list` if text renders as boxes.
+```python
+from stickman_anim import *
+
+def render(f):
+    c = Frame(f)
+    c.floor(322)
+    c.robot(160, 322, eye=CYAN, hr=(220, 260))
+    c.human(480, 322, thumbs_up=True)
+    c.text((320, 50), "AI Review Pipeline", font(20), WHITE, "mm")
+    return c.image()
+
+if __name__ == "__main__":
+    script = "AI agents write code and run tests. A human engineer reviews and approves."
+    export_with_voice(
+        render=render,
+        script_text=script,
+        name="review_pipeline",
+        style="hormozi-bold",     # Subtitle style
+        pos_y=75.0,               # 75% down from top
+        voice="Charon",           # Narration voice
+        ms=120                    # 120ms per frame
+    )
+```
+
+This automatically:
+1. Generates speech with `Charon` via Gemini TTS.
+2. Synchronizes the total animation frame count to match the audio duration.
+3. Renders the stickman visual frames into MP4.
+4. Burns styled subtitles with active-word highlights at 75% down the screen.
+5. Muxes speech audio and writes `review_pipeline.mp4`.
+
+---
+
+## 4. Visual Style Rules
+
+- **Black background with white 2.6px lines (default; `bg-white` flips to black on white), round caps.**
+- **Stop-motion boil.** Every primitive jitters its points by about 1.2px, seeded by the frame number.
+- **Colour means state**: grey/dim = idle, cyan = working/active, green = done/success, red = failure.
+- **Two kinds of characters**: AI agents are *robot-stickmen* (square head, eyes, mouth grille, antenna: `robot()`); people are *round-head stickmen* with glasses (`human()`).
+- **No brand logos**: Label windows with plain text instead of logos.
+
+---
+
+## 5. CLI Commands
+
+```bash
+# Render bundled demos
+stickman demo pr_review video-hd
+
+# Generate speech narration
+stickman voice "Automation complete" --output speech.wav --voice Charon
+
+# Burn styled subtitles into existing video
+stickman caption my_video.mp4 --text "Spoken script" --style hormozi-bold --pos-y 75
+
+# Explore 400+ subtitle presets
+stickman presets --search neon
+stickman presets --category minimal
+```

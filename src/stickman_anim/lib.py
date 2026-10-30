@@ -30,6 +30,17 @@ import random
 
 from PIL import Image, ImageDraw, ImageFont
 
+from .paths import Path, Point, apply_rough_bowing, generate_hatch_fill, generate_stipple_fill, draw_hand_pen
+from .svg_import import parse_svg, parse_svg_path_d
+from .icons import get_icon_paths, load_icon_svg
+from .generators import (
+    image_to_sketch_paths, parse_sketch_dsl, text_to_pen_strokes, latex_to_math_paths,
+    circle_annotation_path, underline_annotation_path, bracket_annotation_path, curved_arrow_path,
+    get_browser_mockup_paths, get_terminal_mockup_paths, get_phone_mockup_paths, render_paper_background
+)
+from .diagrams import render_diagram_paths, chart_bar_paths, chart_line_paths, chart_pie_paths
+
+
 # ------------------------------------------------------------------ flags
 # Output format and colour theme are chosen with FLAGS, read at import time from the script's command line
 # (e.g. `python make_x.py video-4k bg-white`) or from the STICKMAN_FLAGS env var. They must be known before
@@ -370,6 +381,166 @@ class Frame:
         elif state == "fail":
             self.cross(c, 10, RED, 2.4)
 
+
+    # ---- Universal Path & Generator Engine
+    def draw_path(self, path, col=WHITE, w=2.6, draw_on=1.0, pen=False, fill_style=None, fill_col=None, double_stroke=True):
+        """Render a Path object with rough.js-style sketchy strokes, fills, and 0..1 draw-on reveal."""
+        if not path:
+            return
+        sliced = path.slice(draw_on)
+        if not sliced:
+            return
+
+        last_pt = None
+        # Fills (if requested and polygon is closed)
+        if fill_style and fill_style != "none":
+            f_col = fill_col or (col[0], col[1], col[2], 180 if len(col) == 4 else 180)
+            for poly in sliced:
+                if len(poly) >= 3:
+                    if fill_style in ("hatch", "crosshatch"):
+                        h_lines = generate_hatch_fill(poly, spacing=8.0, cross=(fill_style == "crosshatch"), rng=self.rng)
+                        for p0, p1 in h_lines:
+                            self.line(p0, p1, col=f_col, w=max(1.0, w * 0.6), jit=0.5)
+                    elif fill_style == "stipple":
+                        dots = generate_stipple_fill(poly, density=0.04, rng=self.rng)
+                        for dpt in dots:
+                            self.circle(dpt, 1.0, col=f_col, fill=True)
+
+        # Sketchy strokes with bowing & double strokes
+        for poly in sliced:
+            if len(poly) < 2:
+                continue
+            strokes = apply_rough_bowing(poly, self.rng, bowing=0.7, roughness=1.0, double_stroke=double_stroke)
+            for stroke_pts in strokes:
+                for k in range(len(stroke_pts) - 1):
+                    self.line(stroke_pts[k], stroke_pts[k+1], col=col, w=w, jit=0.4)
+            last_pt = poly[-1]
+
+        # Draw hand pen cursor at active tip
+        if pen and 0.0 < draw_on < 1.0 and last_pt:
+            draw_hand_pen(self.d, last_pt, S, pen_col=WHITE)
+
+    def svg(self, svg_source, box, col=WHITE, w=2.4, draw_on=1.0, pen=False, fill_style=None):
+        """Import and render an SVG file or string scaled to box=(cx, cy, w, h)."""
+        paths = parse_svg(svg_source, target_box=box)
+        for p in paths:
+            self.draw_path(p, col=col, w=w, draw_on=draw_on, pen=pen, fill_style=fill_style)
+
+    def icon(self, name, center, size=32, col=WHITE, w=2.4, draw_on=1.0, pen=False, fill_style=None):
+        """Draw an icon from Lucide/Tabler (offline bundle or on-demand cached CDN)."""
+        paths = get_icon_paths(name, (center[0], center[1], size, size))
+        for p in paths:
+            self.draw_path(p, col=col, w=w, draw_on=draw_on, pen=pen, fill_style=fill_style)
+
+    def image_sketch(self, img, box, threshold=120, col=WHITE, w=2.0, draw_on=1.0, pen=False):
+        """Trace and sketch any reference image into hand-drawn strokes."""
+        paths = image_to_sketch_paths(img, box, threshold=threshold)
+        for p in paths:
+            self.draw_path(p, col=col, w=w, draw_on=draw_on, pen=pen)
+
+    def sketch_dsl(self, spec, origin=(0, 0), scale=1.0, col=WHITE, w=2.4, draw_on=1.0, pen=False):
+        """Render custom shapes declaratively from an agent/LLM JSON specification."""
+        paths = parse_sketch_dsl(spec, origin=origin, scale=scale)
+        for p in paths:
+            self.draw_path(p, col=col, w=w, draw_on=draw_on, pen=pen)
+
+    def write_text(self, xy, text_str, size=20, col=WHITE, progress=1.0, pen=True, bangla=False):
+        """Write shaped text on paper with pen cursor (safe for Latin & complex Bangla)."""
+        fnt = font(size, bangla=bangla)
+        paths = text_to_pen_strokes(text_str, fnt, xy, scale_factor=S)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.0, draw_on=progress, pen=pen)
+
+    def latex(self, expr, xy, size=24, col=WHITE, draw_on=1.0, pen=True):
+        """Render LaTeX mathematical formulas by hand."""
+        paths = latex_to_math_paths(expr, xy, size=size)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.2, draw_on=draw_on, pen=pen)
+
+    def mermaid(self, mermaid_code, box, col=WHITE, draw_on=1.0, active_node=None):
+        """Parse and render Mermaid flowchart/sequence diagrams with automatic topological layout."""
+        paths, node_labels, edge_labels = render_diagram_paths(mermaid_code, box)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.4, draw_on=draw_on)
+        fnt = font(11)
+        for pt, lbl in node_labels:
+            ncol = CYAN if active_node and active_node in lbl else WHITE
+            self.text(pt, lbl, fnt, col=ncol, anchor="mm")
+        for pt, lbl in edge_labels:
+            self.text(pt, lbl, fnt, col=GREY, anchor="mm")
+
+    def chart_bar(self, box, data, title="", col=WHITE, progress=1.0):
+        """Render an xkcd-style hand-drawn bar chart."""
+        paths, labels = chart_bar_paths(box, data, title=title, progress=progress)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.4, draw_on=1.0)
+        fnt = font(11)
+        for pt, lbl in labels:
+            self.text(pt, lbl, fnt, col=col, anchor="mm")
+
+    def chart_line(self, box, series, labels_x=None, title="", col=WHITE, progress=1.0):
+        """Render an xkcd-style hand-drawn line chart."""
+        paths, labels = chart_line_paths(box, series, labels_x=labels_x, title=title, progress=progress)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.4, draw_on=1.0)
+        fnt = font(11)
+        for pt, lbl in labels:
+            self.text(pt, lbl, fnt, col=col, anchor="mm")
+
+    def chart_pie(self, center, radius, data, col=WHITE, progress=1.0):
+        """Render an xkcd-style hand-drawn pie chart."""
+        paths, labels = chart_pie_paths(center, radius, data, progress=progress)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.4, draw_on=1.0)
+        fnt = font(11)
+        for pt, lbl in labels:
+            self.text(pt, lbl, fnt, col=col, anchor="mm")
+
+    def annotate_circle(self, box, col=CYAN, w=2.6, progress=1.0, pen=False):
+        """Draw hand-drawn looping oval around a box."""
+        p = circle_annotation_path(box)
+        self.draw_path(p, col=col, w=w, draw_on=progress, pen=pen)
+
+    def annotate_underline(self, xy, length, style="wave", col=CYAN, w=2.4, progress=1.0):
+        """Draw hand-drawn underline (wave, double, straight)."""
+        p = underline_annotation_path(xy, length, style=style)
+        self.draw_path(p, col=col, w=w, draw_on=progress)
+
+    def annotate_bracket(self, x, y0, y1, side="left", col=CYAN, w=2.4):
+        """Draw hand-drawn curly bracket."""
+        p = bracket_annotation_path(x, y0, y1, side=side)
+        self.draw_path(p, col=col, w=w, draw_on=1.0)
+
+    def arrow_curved(self, p0, p1, bend=0.25, col=WHITE, w=2.6, progress=1.0):
+        """Draw curved sketchy arrow with arrowhead."""
+        p = curved_arrow_path(p0, p1, bend=bend)
+        self.draw_path(p, col=col, w=w, draw_on=progress)
+
+    def mockup_browser(self, box, url="https://app.dev", col=WHITE, progress=1.0):
+        """Draw browser window mockup with address bar and buttons."""
+        paths, labels = get_browser_mockup_paths(box, url=url)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.2, draw_on=progress)
+        fnt = font(10)
+        for pt, lbl in labels:
+            self.text(pt, lbl, fnt, col=GREY, anchor="lm")
+
+    def mockup_terminal(self, box, col=WHITE, progress=1.0):
+        """Draw terminal console mockup."""
+        paths = get_terminal_mockup_paths(box)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.2, draw_on=progress)
+
+    def mockup_phone(self, box, col=WHITE, progress=1.0):
+        """Draw smartphone mockup."""
+        paths = get_phone_mockup_paths(box)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.2, draw_on=progress)
+
+    def background(self, style="dark"):
+        """Apply paper background texture: dark, light, notebook, blueprint, chalkboard, sepia, grid."""
+        render_paper_background(self.img, style=style, s_factor=S)
+
     def avatar(self, image, center, radius, ring=WHITE):
         """Paste a user-supplied picture into a round badge (white-backed art survives the black canvas)."""
         side = radius * 2 * S
@@ -414,10 +585,10 @@ def _render_one(f):
 
 
 def _resolve_workers(workers):
+    import multiprocessing as mp
+    if "fork" not in mp.get_all_start_methods():
+        return 1                                  # Windows / macOS spawn: stay single-process
     if workers in (None, "auto"):
-        import multiprocessing as mp
-        if "fork" not in mp.get_all_start_methods():
-            return 1                                  # Windows / macOS spawn: stay single-process
         return max(1, min(_os.cpu_count() or 1, 4))
     return max(1, int(workers))
 
@@ -526,3 +697,62 @@ def main(render, n, name, sheet_frames=None, ms=120):
     if sheet_frames:
         sheet(render, sheet_frames, base + "_sheet.png")
     print("wrote", export(render, n, base, ms))
+
+
+# ------------------------------------------------------------------ voice & captions integration
+def export_with_voice(
+    render,
+    script_text: str,
+    name: str = "anim_voiced",
+    style: str = "hormozi-bold",
+    pos_y: float = 75.0,
+    voice: str = "Charon",
+    ms: int = 120,
+    audio_path = None,
+    workers = "auto",
+) -> str:
+    """
+    Render animation synchronized to voiceover audio and add animated captions.
+    1. Generates speech with TTS (default voice: Charon) or uses existing audio.
+    2. Syncs total animation frame count to match audio duration.
+    3. Renders video frames.
+    4. Burns styled subtitles with active-word highlights at pos_y (default: 75% from top).
+    5. Returns the final captioned MP4 path.
+    """
+    import tempfile
+    from .tts import generate_speech, get_audio_duration
+    from .captions import add_captions
+
+    # 1. Generate speech if not supplied
+    if not audio_path or not _os.path.isfile(audio_path):
+        audio_path = generate_speech(script_text, voice=voice)
+
+    # 2. Inspect audio duration and calculate frame count
+    dur = get_audio_duration(audio_path)
+    fps = round(1000.0 / ms, 3)
+    n_frames = max(1, int(dur * fps))
+    print(f"voiceover duration: {dur:.2f}s -> {n_frames} frames at {fps} fps")
+
+    # 3. Render silent MP4 video
+    silent_tmp = tempfile.mktemp(suffix=".mp4")
+    render_mp4(render, n_frames, silent_tmp, ms=ms, loops=1, workers=workers)
+
+    # 4. Burn subtitles and mux audio into final output
+    final_output = name if name.endswith(".mp4") else f"{name}.mp4"
+    result = add_captions(
+        silent_tmp,
+        audio_path=audio_path,
+        script_text=script_text,
+        style_name=style,
+        pos_y=pos_y,
+        output_path=final_output
+    )
+
+    if _os.path.isfile(silent_tmp):
+        try:
+            _os.remove(silent_tmp)
+        except Exception:
+            pass
+
+    print(f"wrote captioned video: {result}")
+    return result

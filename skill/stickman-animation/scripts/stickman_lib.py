@@ -414,10 +414,10 @@ def _render_one(f):
 
 
 def _resolve_workers(workers):
+    import multiprocessing as mp
+    if "fork" not in mp.get_all_start_methods():
+        return 1                                  # Windows / macOS spawn: stay single-process
     if workers in (None, "auto"):
-        import multiprocessing as mp
-        if "fork" not in mp.get_all_start_methods():
-            return 1                                  # Windows / macOS spawn: stay single-process
         return max(1, min(_os.cpu_count() or 1, 4))
     return max(1, int(workers))
 
@@ -526,3 +526,62 @@ def main(render, n, name, sheet_frames=None, ms=120):
     if sheet_frames:
         sheet(render, sheet_frames, base + "_sheet.png")
     print("wrote", export(render, n, base, ms))
+
+
+# ------------------------------------------------------------------ voice & captions integration
+def export_with_voice(
+    render,
+    script_text: str,
+    name: str = "anim_voiced",
+    style: str = "hormozi-bold",
+    pos_y: float = 75.0,
+    voice: str = "Charon",
+    ms: int = 120,
+    audio_path = None,
+    workers = "auto",
+) -> str:
+    """
+    Render animation synchronized to voiceover audio and add animated captions.
+    1. Generates speech with TTS (default voice: Charon) or uses existing audio.
+    2. Syncs total animation frame count to match audio duration.
+    3. Renders video frames.
+    4. Burns styled subtitles with active-word highlights at pos_y (default: 75% from top).
+    5. Returns the final captioned MP4 path.
+    """
+    import tempfile
+    from .tts import generate_speech, get_audio_duration
+    from .captions import add_captions
+
+    # 1. Generate speech if not supplied
+    if not audio_path or not _os.path.isfile(audio_path):
+        audio_path = generate_speech(script_text, voice=voice)
+
+    # 2. Inspect audio duration and calculate frame count
+    dur = get_audio_duration(audio_path)
+    fps = round(1000.0 / ms, 3)
+    n_frames = max(1, int(dur * fps))
+    print(f"voiceover duration: {dur:.2f}s -> {n_frames} frames at {fps} fps")
+
+    # 3. Render silent MP4 video
+    silent_tmp = tempfile.mktemp(suffix=".mp4")
+    render_mp4(render, n_frames, silent_tmp, ms=ms, loops=1, workers=workers)
+
+    # 4. Burn subtitles and mux audio into final output
+    final_output = name if name.endswith(".mp4") else f"{name}.mp4"
+    result = add_captions(
+        silent_tmp,
+        audio_path=audio_path,
+        script_text=script_text,
+        style_name=style,
+        pos_y=pos_y,
+        output_path=final_output
+    )
+
+    if _os.path.isfile(silent_tmp):
+        try:
+            _os.remove(silent_tmp)
+        except Exception:
+            pass
+
+    print(f"wrote captioned video: {result}")
+    return result
