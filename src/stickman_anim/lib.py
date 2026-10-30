@@ -40,6 +40,15 @@ from .generators import (
 )
 from .diagrams import render_diagram_paths, chart_bar_paths, chart_line_paths, chart_pie_paths
 from .rig import Character, Pose, solve_2bone_ik, get_action_pose, draw_emote, draw_speech_bubble, draw_crowd
+from .motion import (
+    Track, Camera, ParticleSystem, draw_speed_lines,
+    stagger, squash_stretch, spring,
+    ease_linear, ease_in_quad, ease_out_quad, ease_in_out_quad,
+    ease_in_cubic, ease_out_cubic, ease_in_out_cubic,
+    ease_out_back, ease_in_back, ease_in_out_back,
+    ease_out_elastic, ease_out_bounce,
+    transition_wipe, transition_iris, transition_ink_splash
+)
 
 
 # ------------------------------------------------------------------ flags
@@ -595,6 +604,27 @@ class Frame:
     def crowd(self, box, count=8, action="celebrate", t=None):
         """Render procedural crowd of stick figures with staggered animation phases."""
         draw_crowd(self, box, count=count, action=action, t=self.f if t is None else t)
+
+    # ---- Motion & Particles (Phase C)
+    def confetti(self, origin, t=None, count=24, seed=42):
+        """Fluttering colorful rectangles that fall with gravity and sway."""
+        ParticleSystem.confetti(self, origin, self.f if t is None else t, count=count, seed=seed)
+
+    def sparks(self, origin, t=None, count=16, seed=42, col=(255, 230, 0)):
+        """Bright radiating spark lines with velocity decay."""
+        ParticleSystem.sparks(self, origin, self.f if t is None else t, count=count, seed=seed, col=col)
+
+    def smoke(self, origin, t=None, count=8, seed=42):
+        """Puffs of wobbly cartoon smoke rising and expanding."""
+        ParticleSystem.smoke(self, origin, self.f if t is None else t, count=count, seed=seed)
+
+    def rain(self, box, t=None, count=30, seed=42):
+        """Angled raindrops falling across the stage."""
+        ParticleSystem.rain(self, box, self.f if t is None else t, count=count, seed=seed)
+
+    def speed_lines(self, direction="right", intensity=1.0, count=14, col=(160, 160, 170)):
+        """Draw comic action speed lines across edges."""
+        draw_speed_lines(self, direction=direction, intensity=intensity, count=count, col=col)
 
     def avatar(self, image, center, radius, ring=WHITE):
         """Paste a user-supplied picture into a round badge (white-backed art survives the black canvas)."""

@@ -27,12 +27,12 @@ Order of execution: **A → B → C → E → D → G → F → H → I**.
 - [x] B4. Expressions, eye look-at tracking, and audio amplitude-driven mouth movement (lip-sync)
 - [x] B5. Emotes (`!`, `?`, heart, sweat, zzz), speech bubbles, thought bubbles, and crowds
 
-## [ ] Phase C: Motion, Easing, Particles & Camera
-- [ ] C1. Easing library: cubic, back overshoot, elastic, bounce, spring, stagger, squash & stretch (`motion.py`)
-- [ ] C2. Keyframe tracks (`Track`) for scalars and points
-- [ ] C3. Deterministic particles (confetti, sparks, smoke, rain) & speed lines
-- [ ] C4. Virtual camera: pan, zoom, shake, follow, multi-plane parallax
-- [ ] C5. Scene transitions: wipe, iris, ink splash, zoom-through, page turn
+## [x] Phase C: Motion, Easing, Particles & Camera
+- [x] C1. Easing library: cubic, back overshoot, elastic, bounce, spring, stagger, squash & stretch (`motion.py`)
+- [x] C2. Keyframe tracks (`Track`) for scalars and points
+- [x] C3. Deterministic particles (confetti, sparks, smoke, rain) & speed lines
+- [x] C4. Virtual camera: pan, zoom, shake, follow, multi-plane parallax
+- [x] C5. Scene transitions: wipe, iris, ink splash, zoom-through, page turn
 
 ## [ ] Phase E: Audio Cues, Multi-Speaker & SFX
 - [ ] E1. `@cue(name)` script marker parser and exact frame alignment (`audio_fx.py`)
