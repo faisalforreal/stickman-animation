@@ -49,6 +49,11 @@ from .motion import (
     ease_out_elastic, ease_out_bounce,
     transition_wipe, transition_iris, transition_ink_splash
 )
+from .audio_fx import (
+    parse_cued_script, CueTimeline,
+    parse_dialogue_script, generate_dialogue_audio, get_active_speaker_at,
+    calculate_rms_envelope, synthesize_sfx, mix_audio_tracks
+)
 
 
 # ------------------------------------------------------------------ flags
@@ -794,23 +799,37 @@ def export_with_voice(
     voice: str = "Charon",
     ms: int = 120,
     audio_path = None,
+    bgm_path = None,
+    bgm_volume: float = 0.12,
     workers = "auto",
 ) -> str:
     """
-    Render animation synchronized to voiceover audio and add animated captions.
-    1. Generates speech with TTS (default voice: Charon) or uses existing audio.
-    2. Syncs total animation frame count to match audio duration.
-    3. Renders video frames.
-    4. Burns styled subtitles with active-word highlights at pos_y (default: 75% from top).
-    5. Returns the final captioned MP4 path.
+    Render animation synchronized to voiceover audio, cues, and animated captions.
+    1. Parses @cue(name) markers from script_text into a CueTimeline.
+    2. Generates clean speech with TTS (default voice: Charon) or uses existing audio.
+    3. Mixes background music if bgm_path is provided with auto-ducking.
+    4. Computes per-frame RMS audio amplitude envelope for lip-sync.
+    5. Syncs total animation frame count to match audio duration.
+    6. Renders video frames (passing frame index, cues, and amplitude).
+    7. Burns styled subtitles with active-word highlights at pos_y (default: 75% from top).
+    8. Returns the final captioned MP4 path.
     """
+    import inspect
     import tempfile
     from .tts import generate_speech, get_audio_duration
     from .captions import add_captions
+    from .audio_fx import parse_cued_script, CueTimeline, calculate_rms_envelope, mix_audio_tracks
+
+    clean_script, cue_fractions = parse_cued_script(script_text)
 
     # 1. Generate speech if not supplied
     if not audio_path or not _os.path.isfile(audio_path):
-        audio_path = generate_speech(script_text, voice=voice)
+        audio_path = generate_speech(clean_script, voice=voice)
+
+    # Optional BGM mix
+    if bgm_path and _os.path.isfile(bgm_path):
+        mixed_tmp = tempfile.mktemp(suffix=".wav")
+        audio_path = mix_audio_tracks(audio_path, bgm_path=bgm_path, output_path=mixed_tmp, bgm_volume=bgm_volume)
 
     # 2. Inspect audio duration and calculate frame count
     dur = get_audio_duration(audio_path)
@@ -818,16 +837,31 @@ def export_with_voice(
     n_frames = max(1, int(dur * fps))
     print(f"voiceover duration: {dur:.2f}s -> {n_frames} frames at {fps} fps")
 
+    cues = CueTimeline(cue_fractions, n_frames)
+    amplitudes = calculate_rms_envelope(audio_path, fps=fps, n_frames=n_frames)
+
+    # Wrap render to supply cues / amplitude if signature accepts them
+    sig = inspect.signature(render)
+    param_count = len(sig.parameters)
+
+    def render_wrapper(f):
+        if param_count >= 3:
+            return render(f, cues, amplitudes[f] if f < len(amplitudes) else 0.0)
+        elif param_count == 2:
+            return render(f, cues)
+        else:
+            return render(f)
+
     # 3. Render silent MP4 video
     silent_tmp = tempfile.mktemp(suffix=".mp4")
-    render_mp4(render, n_frames, silent_tmp, ms=ms, loops=1, workers=workers)
+    render_mp4(render_wrapper, n_frames, silent_tmp, ms=ms, loops=1, workers=workers)
 
     # 4. Burn subtitles and mux audio into final output
     final_output = name if name.endswith(".mp4") else f"{name}.mp4"
     result = add_captions(
         silent_tmp,
         audio_path=audio_path,
-        script_text=script_text,
+        script_text=clean_script,
         style_name=style,
         pos_y=pos_y,
         output_path=final_output

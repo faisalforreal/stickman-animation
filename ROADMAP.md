@@ -34,10 +34,10 @@ Order of execution: **A → B → C → E → D → G → F → H → I**.
 - [x] C4. Virtual camera: pan, zoom, shake, follow, multi-plane parallax
 - [x] C5. Scene transitions: wipe, iris, ink splash, zoom-through, page turn
 
-## [ ] Phase E: Audio Cues, Multi-Speaker & SFX
-- [ ] E1. `@cue(name)` script marker parser and exact frame alignment (`audio_fx.py`)
-- [ ] E2. Multi-speaker dialogue generation with speaker lip-sync routing (`audio_fx.py`)
-- [ ] E3. Procedural CC0 sound effects synthesizer (pop, click, whoosh, ding, pen scratch) & BGM auto-ducking + loudnorm
+## [x] Phase E: Audio Cues, Multi-Speaker & SFX
+- [x] E1. `@cue(name)` script marker parser and exact frame alignment (`audio_fx.py`)
+- [x] E2. Multi-speaker dialogue generation with speaker lip-sync routing (`audio_fx.py`)
+- [x] E3. Procedural CC0 sound effects synthesizer (pop, click, whoosh, ding, pen scratch) & BGM auto-ducking + loudnorm
 
 ## [ ] Phase D: Multi-Scene Timeline, Caching & Performance
 - [ ] D1. Multi-scene `Timeline` & `project.json` runner with transitions and B-roll/PiP (`timeline.py`)
