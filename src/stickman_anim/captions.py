@@ -525,3 +525,55 @@ def add_captions(
                 pass
 
     return output_path
+
+
+def format_srt_time(seconds: float) -> str:
+    """Format seconds into SRT timestamp HH:MM:SS,mmm."""
+    seconds = max(0.0, float(seconds))
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    millis = int(round((seconds - int(seconds)) * 1000))
+    if millis >= 1000:
+        millis = 999
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+
+def format_vtt_time(seconds: float) -> str:
+    """Format seconds into WebVTT timestamp HH:MM:SS.mmm."""
+    seconds = max(0.0, float(seconds))
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    millis = int(round((seconds - int(seconds)) * 1000))
+    if millis >= 1000:
+        millis = 999
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
+
+
+def export_srt(chunks: List[ChunkItem], output_path: str) -> str:
+    """Export subtitle chunks to SubRip (.srt) sidecar file."""
+    lines = []
+    for idx, ch in enumerate(chunks, 1):
+        s = format_srt_time(ch.start)
+        e = format_srt_time(ch.end)
+        lines.append(f"{idx}\n{s} --> {e}\n{ch.text}\n")
+    content = "\n".join(lines)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return output_path
+
+
+def export_vtt(chunks: List[ChunkItem], output_path: str) -> str:
+    """Export subtitle chunks to WebVTT (.vtt) sidecar file."""
+    lines = ["WEBVTT\n"]
+    for idx, ch in enumerate(chunks, 1):
+        s = format_vtt_time(ch.start)
+        e = format_vtt_time(ch.end)
+        lines.append(f"{idx}\n{s} --> {e}\n{ch.text}\n")
+    content = "\n".join(lines)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return output_path

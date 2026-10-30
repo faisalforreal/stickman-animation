@@ -55,6 +55,8 @@ from .audio_fx import (
     calculate_rms_envelope, synthesize_sfx, mix_audio_tracks
 )
 from .timeline import Scene, Timeline, run_project_file, ASPECT_PRESETS
+from .qa import lint_storyboard, search_assets, QAReport, QAIssue
+from .storyboard import render_storyboard, build_storyboard_timeline
 
 
 # ------------------------------------------------------------------ flags

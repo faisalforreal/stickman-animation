@@ -12,6 +12,9 @@ commands:
   voice TEXT [options]      generate speech audio using configured TTS (Gemini/OpenAI/Custom)
   caption VIDEO [options]   burn styled subtitles & audio into a video (AutoCaptions engine)
   presets [options]         list available subtitle style presets (400+ CapCut styles)
+  storyboard FILE [options] render declarative storyboard JSON
+  lint FILE                 check storyboard for off-canvas text, collisions, pacing
+  assets QUERY              search bundled icons, poses, styles, accessories
   flags                     list the format and theme flags
   version
 
@@ -100,6 +103,51 @@ def _cmd_caption(args):
     return 0
 
 
+def _cmd_storyboard(args):
+    from .storyboard import render_storyboard
+    parser = argparse.ArgumentParser(prog="stickman storyboard", description="Render animation from a declarative storyboard JSON.")
+    parser.add_argument("spec", help="Storyboard JSON file path")
+    parser.add_argument("-o", "--output", default="storyboard_output.mp4", help="Output MP4 file path")
+    parser.add_argument("--no-lint", action="store_true", help="Skip pre-render QA linting")
+    opts = parser.parse_args(args)
+
+    out = render_storyboard(opts.spec, output_path=opts.output, lint=not opts.no_lint)
+    print(f"wrote storyboard video: {out}")
+    return 0
+
+
+def _cmd_lint(args):
+    from .qa import lint_storyboard
+    import json
+    parser = argparse.ArgumentParser(prog="stickman lint", description="Lint a storyboard JSON for off-canvas text, collisions, and pacing.")
+    parser.add_argument("spec", help="Storyboard JSON file path")
+    opts = parser.parse_args(args)
+
+    with open(opts.spec, "r", encoding="utf-8") as f:
+        spec = json.load(f)
+    rep = lint_storyboard(spec)
+    print(rep.summary())
+    return 0 if rep.passed else 1
+
+
+def _cmd_assets(args):
+    from .qa import search_assets
+    parser = argparse.ArgumentParser(prog="stickman assets", description="Search bundled icons, poses, presets, and accessories.")
+    parser.add_argument("query", help="Keyword to search (e.g. database, robot, walk)")
+    opts = parser.parse_args(args)
+
+    matches = search_assets(opts.query)
+    if not matches:
+        print(f"No assets found matching {opts.query!r}")
+        return 0
+    print(f"Asset Search Results for {opts.query!r}:")
+    for category, items in matches.items():
+        print(f"\n[{category.upper()}]:")
+        for it in items:
+            print(f"  - {it}")
+    return 0
+
+
 def _cmd_presets(args):
     from .presets import list_presets
     parser = argparse.ArgumentParser(prog="stickman presets", description="List available caption style presets.")
@@ -137,6 +185,12 @@ def main(argv=None):
         return _cmd_caption(rest)
     if cmd == "presets":
         return _cmd_presets(rest)
+    if cmd == "storyboard":
+        return _cmd_storyboard(rest)
+    if cmd == "lint":
+        return _cmd_lint(rest)
+    if cmd == "assets":
+        return _cmd_assets(rest)
     if cmd == "render":
         if not rest:
             print("stickman render: give a script path\n\n" + USAGE)

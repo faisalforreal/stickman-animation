@@ -43,18 +43,18 @@ Order of execution: **A → B → C → E → D → G → F → H → I**.
 - [x] D1. Multi-scene `Timeline` & `project.json` runner with transitions and B-roll/PiP (`timeline.py`)
 - [x] D2. Hash-based scene render cache (`.stickman_cache/`)
 - [x] D3. Windows/macOS ThreadPool multiprocessing fix + FFmpeg GPU encoder auto-probe
-- [ ] D4. Aspect presets (`16:9`, `9:16`, `1:1`) with safe-zone caption placement
+- [x] D4. Aspect presets (`16:9`, `9:16`, `1:1`) with safe-zone caption placement
 
-## [ ] Phase G: Agent Layer (Storyboard, Linter, Assets)
-- [ ] G1. Declarative Storyboard JSON runner (`storyboard.py`)
-- [ ] G2. Automated Self-QA bounding-box linter (off-canvas, text overlap, caption collision) (`qa.py`)
-- [ ] G3. Searchable asset index CLI (`stickman assets`)
+## [x] Phase G: Agent Layer (Storyboard, Linter, Assets)
+- [x] G1. Declarative Storyboard JSON runner (`storyboard.py`)
+- [x] G2. Automated Self-QA bounding-box linter (off-canvas, text overlap, caption collision) (`qa.py`)
+- [x] G3. Searchable asset index CLI (`stickman assets`)
 - [ ] G4. Restructured `SKILL.md` decision tree + cookbooks
 
-## [ ] Phase F: Caption Upgrades
-- [ ] F1. Auto emphasis and keyword emoji injection
-- [ ] F2. Sidecar `.srt` and `.vtt` export
-- [ ] F3. Stage collision avoidance & 9:16 safe zones
+## [x] Phase F: Caption Upgrades
+- [x] F1. Auto emphasis and keyword emoji injection
+- [x] F2. Sidecar `.srt` and `.vtt` export
+- [x] F3. Stage collision avoidance & 9:16 safe zones
 
 ## [ ] Phase H: Export & Distribution
 - [ ] H1. Social export presets (YouTube, Shorts, Reels, X, LinkedIn), WebM/MOV transparency
