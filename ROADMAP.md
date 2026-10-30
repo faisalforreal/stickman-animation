@@ -49,7 +49,7 @@ Order of execution: **A → B → C → E → D → G → F → H → I**.
 - [x] G1. Declarative Storyboard JSON runner (`storyboard.py`)
 - [x] G2. Automated Self-QA bounding-box linter (off-canvas, text overlap, caption collision) (`qa.py`)
 - [x] G3. Searchable asset index CLI (`stickman assets`)
-- [ ] G4. Restructured `SKILL.md` decision tree + cookbooks
+- [x] G4. Restructured `SKILL.md` decision tree + cookbooks
 
 ## [x] Phase F: Caption Upgrades
 - [x] F1. Auto emphasis and keyword emoji injection
@@ -61,7 +61,7 @@ Order of execution: **A → B → C → E → D → G → F → H → I**.
 - [x] H2. Animated SVG exporter (self-contained CSS path animation)
 - [x] H3. Auto-Thumbnail generator (`<name>_thumb.png`)
 
-## [ ] Phase I: Quality, Licenses & Antigravity Sync
-- [ ] I1. Asset license manifest (`LICENSES.md`)
-- [ ] I2. Pytest suite coverage across all phases (all passing)
-- [ ] I3. Full Antigravity global skill sync & validation
+## [x] Phase I: Quality, Licenses & Antigravity Sync
+- [x] I1. Asset license manifest (`LICENSES.md`)
+- [x] I2. Pytest suite coverage across all phases (all passing)
+- [x] I3. Full Antigravity global skill sync & validation
