@@ -39,6 +39,7 @@ from .generators import (
     get_browser_mockup_paths, get_terminal_mockup_paths, get_phone_mockup_paths, render_paper_background
 )
 from .diagrams import render_diagram_paths, chart_bar_paths, chart_line_paths, chart_pie_paths
+from .rig import Character, Pose, solve_2bone_ik, get_action_pose, draw_emote, draw_speech_bubble, draw_crowd
 
 
 # ------------------------------------------------------------------ flags
@@ -540,6 +541,60 @@ class Frame:
     def background(self, style="dark"):
         """Apply paper background texture: dark, light, notebook, blueprint, chalkboard, sepia, grid."""
         render_paper_background(self.img, style=style, s_factor=S)
+
+    # ---- Articulated Characters & Rigging (Phase B)
+    def character(
+        self,
+        cx,
+        fl,
+        kind="human",
+        scale=1.0,
+        facing="right",
+        action="idle",
+        t=None,
+        hl=None,
+        hr=None,
+        accessories=None,
+        props=None,
+        look_at=None,
+        mouth_open=0.0,
+        expression="neutral",
+        col=WHITE,
+    ):
+        """Render articulated character with 2-bone IK arms/legs and procedural actions."""
+        char = Character(
+            kind=kind,
+            scale=scale,
+            facing=facing,
+            accessories=accessories,
+            props=props,
+        )
+        char.look_at = look_at
+        char.mouth_open = mouth_open
+        char.expression = expression
+        char.draw(
+            self,
+            cx,
+            fl,
+            action=action,
+            t=self.f if t is None else t,
+            hl=hl,
+            hr=hr,
+            col=col,
+        )
+        return char
+
+    def emote(self, xy, kind="!", col=None):
+        """Draw comic emotion indicator over character head (!, ?, heart, sweat, zzz)."""
+        draw_emote(self, xy, kind=kind, col=col)
+
+    def speech_bubble(self, speaker_xy, text, box_w=120.0, box_h=40.0, thought=False, progress=1.0, col=None):
+        """Render hand-drawn speech or thought bubble pointing to speaker."""
+        draw_speech_bubble(self, speaker_xy, text, box_w=box_w, box_h=box_h, thought=thought, progress=progress, col=col)
+
+    def crowd(self, box, count=8, action="celebrate", t=None):
+        """Render procedural crowd of stick figures with staggered animation phases."""
+        draw_crowd(self, box, count=count, action=action, t=self.f if t is None else t)
 
     def avatar(self, image, center, radius, ring=WHITE):
         """Paste a user-supplied picture into a round badge (white-backed art survives the black canvas)."""

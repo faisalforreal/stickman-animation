@@ -30,6 +30,18 @@ import random
 
 from PIL import Image, ImageDraw, ImageFont
 
+from .paths import Path, Point, apply_rough_bowing, generate_hatch_fill, generate_stipple_fill, draw_hand_pen
+from .svg_import import parse_svg, parse_svg_path_d
+from .icons import get_icon_paths, load_icon_svg
+from .generators import (
+    image_to_sketch_paths, parse_sketch_dsl, text_to_pen_strokes, latex_to_math_paths,
+    circle_annotation_path, underline_annotation_path, bracket_annotation_path, curved_arrow_path,
+    get_browser_mockup_paths, get_terminal_mockup_paths, get_phone_mockup_paths, render_paper_background
+)
+from .diagrams import render_diagram_paths, chart_bar_paths, chart_line_paths, chart_pie_paths
+from .rig import Character, Pose, solve_2bone_ik, get_action_pose, draw_emote, draw_speech_bubble, draw_crowd
+
+
 # ------------------------------------------------------------------ flags
 # Output format and colour theme are chosen with FLAGS, read at import time from the script's command line
 # (e.g. `python make_x.py video-4k bg-white`) or from the STICKMAN_FLAGS env var. They must be known before
@@ -369,6 +381,220 @@ class Frame:
             self.check(c, 9, GREEN, 2.4)
         elif state == "fail":
             self.cross(c, 10, RED, 2.4)
+
+
+    # ---- Universal Path & Generator Engine
+    def draw_path(self, path, col=WHITE, w=2.6, draw_on=1.0, pen=False, fill_style=None, fill_col=None, double_stroke=True):
+        """Render a Path object with rough.js-style sketchy strokes, fills, and 0..1 draw-on reveal."""
+        if not path:
+            return
+        sliced = path.slice(draw_on)
+        if not sliced:
+            return
+
+        last_pt = None
+        # Fills (if requested and polygon is closed)
+        if fill_style and fill_style != "none":
+            f_col = fill_col or (col[0], col[1], col[2], 180 if len(col) == 4 else 180)
+            for poly in sliced:
+                if len(poly) >= 3:
+                    if fill_style in ("hatch", "crosshatch"):
+                        h_lines = generate_hatch_fill(poly, spacing=8.0, cross=(fill_style == "crosshatch"), rng=self.rng)
+                        for p0, p1 in h_lines:
+                            self.line(p0, p1, col=f_col, w=max(1.0, w * 0.6), jit=0.5)
+                    elif fill_style == "stipple":
+                        dots = generate_stipple_fill(poly, density=0.04, rng=self.rng)
+                        for dpt in dots:
+                            self.circle(dpt, 1.0, col=f_col, fill=True)
+
+        # Sketchy strokes with bowing & double strokes
+        for poly in sliced:
+            if len(poly) < 2:
+                continue
+            strokes = apply_rough_bowing(poly, self.rng, bowing=0.7, roughness=1.0, double_stroke=double_stroke)
+            for stroke_pts in strokes:
+                for k in range(len(stroke_pts) - 1):
+                    self.line(stroke_pts[k], stroke_pts[k+1], col=col, w=w, jit=0.4)
+            last_pt = poly[-1]
+
+        # Draw hand pen cursor at active tip
+        if pen and 0.0 < draw_on < 1.0 and last_pt:
+            draw_hand_pen(self.d, last_pt, S, pen_col=WHITE)
+
+    def svg(self, svg_source, box, col=WHITE, w=2.4, draw_on=1.0, pen=False, fill_style=None):
+        """Import and render an SVG file or string scaled to box=(cx, cy, w, h)."""
+        paths = parse_svg(svg_source, target_box=box)
+        for p in paths:
+            self.draw_path(p, col=col, w=w, draw_on=draw_on, pen=pen, fill_style=fill_style)
+
+    def icon(self, name, center, size=32, col=WHITE, w=2.4, draw_on=1.0, pen=False, fill_style=None):
+        """Draw an icon from Lucide/Tabler (offline bundle or on-demand cached CDN)."""
+        paths = get_icon_paths(name, (center[0], center[1], size, size))
+        for p in paths:
+            self.draw_path(p, col=col, w=w, draw_on=draw_on, pen=pen, fill_style=fill_style)
+
+    def image_sketch(self, img, box, threshold=120, col=WHITE, w=2.0, draw_on=1.0, pen=False):
+        """Trace and sketch any reference image into hand-drawn strokes."""
+        paths = image_to_sketch_paths(img, box, threshold=threshold)
+        for p in paths:
+            self.draw_path(p, col=col, w=w, draw_on=draw_on, pen=pen)
+
+    def sketch_dsl(self, spec, origin=(0, 0), scale=1.0, col=WHITE, w=2.4, draw_on=1.0, pen=False):
+        """Render custom shapes declaratively from an agent/LLM JSON specification."""
+        paths = parse_sketch_dsl(spec, origin=origin, scale=scale)
+        for p in paths:
+            self.draw_path(p, col=col, w=w, draw_on=draw_on, pen=pen)
+
+    def write_text(self, xy, text_str, size=20, col=WHITE, progress=1.0, pen=True, bangla=False):
+        """Write shaped text on paper with pen cursor (safe for Latin & complex Bangla)."""
+        fnt = font(size, bangla=bangla)
+        paths = text_to_pen_strokes(text_str, fnt, xy, scale_factor=S)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.0, draw_on=progress, pen=pen)
+
+    def latex(self, expr, xy, size=24, col=WHITE, draw_on=1.0, pen=True):
+        """Render LaTeX mathematical formulas by hand."""
+        paths = latex_to_math_paths(expr, xy, size=size)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.2, draw_on=draw_on, pen=pen)
+
+    def mermaid(self, mermaid_code, box, col=WHITE, draw_on=1.0, active_node=None):
+        """Parse and render Mermaid flowchart/sequence diagrams with automatic topological layout."""
+        paths, node_labels, edge_labels = render_diagram_paths(mermaid_code, box)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.4, draw_on=draw_on)
+        fnt = font(11)
+        for pt, lbl in node_labels:
+            ncol = CYAN if active_node and active_node in lbl else WHITE
+            self.text(pt, lbl, fnt, col=ncol, anchor="mm")
+        for pt, lbl in edge_labels:
+            self.text(pt, lbl, fnt, col=GREY, anchor="mm")
+
+    def chart_bar(self, box, data, title="", col=WHITE, progress=1.0):
+        """Render an xkcd-style hand-drawn bar chart."""
+        paths, labels = chart_bar_paths(box, data, title=title, progress=progress)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.4, draw_on=1.0)
+        fnt = font(11)
+        for pt, lbl in labels:
+            self.text(pt, lbl, fnt, col=col, anchor="mm")
+
+    def chart_line(self, box, series, labels_x=None, title="", col=WHITE, progress=1.0):
+        """Render an xkcd-style hand-drawn line chart."""
+        paths, labels = chart_line_paths(box, series, labels_x=labels_x, title=title, progress=progress)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.4, draw_on=1.0)
+        fnt = font(11)
+        for pt, lbl in labels:
+            self.text(pt, lbl, fnt, col=col, anchor="mm")
+
+    def chart_pie(self, center, radius, data, col=WHITE, progress=1.0):
+        """Render an xkcd-style hand-drawn pie chart."""
+        paths, labels = chart_pie_paths(center, radius, data, progress=progress)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.4, draw_on=1.0)
+        fnt = font(11)
+        for pt, lbl in labels:
+            self.text(pt, lbl, fnt, col=col, anchor="mm")
+
+    def annotate_circle(self, box, col=CYAN, w=2.6, progress=1.0, pen=False):
+        """Draw hand-drawn looping oval around a box."""
+        p = circle_annotation_path(box)
+        self.draw_path(p, col=col, w=w, draw_on=progress, pen=pen)
+
+    def annotate_underline(self, xy, length, style="wave", col=CYAN, w=2.4, progress=1.0):
+        """Draw hand-drawn underline (wave, double, straight)."""
+        p = underline_annotation_path(xy, length, style=style)
+        self.draw_path(p, col=col, w=w, draw_on=progress)
+
+    def annotate_bracket(self, x, y0, y1, side="left", col=CYAN, w=2.4):
+        """Draw hand-drawn curly bracket."""
+        p = bracket_annotation_path(x, y0, y1, side=side)
+        self.draw_path(p, col=col, w=w, draw_on=1.0)
+
+    def arrow_curved(self, p0, p1, bend=0.25, col=WHITE, w=2.6, progress=1.0):
+        """Draw curved sketchy arrow with arrowhead."""
+        p = curved_arrow_path(p0, p1, bend=bend)
+        self.draw_path(p, col=col, w=w, draw_on=progress)
+
+    def mockup_browser(self, box, url="https://app.dev", col=WHITE, progress=1.0):
+        """Draw browser window mockup with address bar and buttons."""
+        paths, labels = get_browser_mockup_paths(box, url=url)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.2, draw_on=progress)
+        fnt = font(10)
+        for pt, lbl in labels:
+            self.text(pt, lbl, fnt, col=GREY, anchor="lm")
+
+    def mockup_terminal(self, box, col=WHITE, progress=1.0):
+        """Draw terminal console mockup."""
+        paths = get_terminal_mockup_paths(box)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.2, draw_on=progress)
+
+    def mockup_phone(self, box, col=WHITE, progress=1.0):
+        """Draw smartphone mockup."""
+        paths = get_phone_mockup_paths(box)
+        for p in paths:
+            self.draw_path(p, col=col, w=2.2, draw_on=progress)
+
+    def background(self, style="dark"):
+        """Apply paper background texture: dark, light, notebook, blueprint, chalkboard, sepia, grid."""
+        render_paper_background(self.img, style=style, s_factor=S)
+
+    # ---- Articulated Characters & Rigging (Phase B)
+    def character(
+        self,
+        cx,
+        fl,
+        kind="human",
+        scale=1.0,
+        facing="right",
+        action="idle",
+        t=None,
+        hl=None,
+        hr=None,
+        accessories=None,
+        props=None,
+        look_at=None,
+        mouth_open=0.0,
+        expression="neutral",
+        col=WHITE,
+    ):
+        """Render articulated character with 2-bone IK arms/legs and procedural actions."""
+        char = Character(
+            kind=kind,
+            scale=scale,
+            facing=facing,
+            accessories=accessories,
+            props=props,
+        )
+        char.look_at = look_at
+        char.mouth_open = mouth_open
+        char.expression = expression
+        char.draw(
+            self,
+            cx,
+            fl,
+            action=action,
+            t=self.f if t is None else t,
+            hl=hl,
+            hr=hr,
+            col=col,
+        )
+        return char
+
+    def emote(self, xy, kind="!", col=None):
+        """Draw comic emotion indicator over character head (!, ?, heart, sweat, zzz)."""
+        draw_emote(self, xy, kind=kind, col=col)
+
+    def speech_bubble(self, speaker_xy, text, box_w=120.0, box_h=40.0, thought=False, progress=1.0, col=None):
+        """Render hand-drawn speech or thought bubble pointing to speaker."""
+        draw_speech_bubble(self, speaker_xy, text, box_w=box_w, box_h=box_h, thought=thought, progress=progress, col=col)
+
+    def crowd(self, box, count=8, action="celebrate", t=None):
+        """Render procedural crowd of stick figures with staggered animation phases."""
+        draw_crowd(self, box, count=count, action=action, t=self.f if t is None else t)
 
     def avatar(self, image, center, radius, ring=WHITE):
         """Paste a user-supplied picture into a round badge (white-backed art survives the black canvas)."""

@@ -257,6 +257,26 @@ CURATED_PRESETS: Dict[str, CaptionStyle] = {
         effect_type="POP",
     ),
 
+    # Colorsplosion: Dynamic explosive neon pop with multi-color bursts
+    "colorsplosion": CaptionStyle(
+        name="colorsplosion",
+        font_name="Impact",
+        font_size=48,
+        primary_color="#FFFFFF",
+        highlight_color="#FF007F",       # Explosive Neon Hot Pink
+        secondary_color="#00F0FF",       # Electric Cyan
+        stroke_color="#000000",
+        stroke_width=4.0,
+        shadow_color="#000000",
+        shadow_depth=2.5,
+        has_box=False,
+        all_caps=True,
+        bold=True,
+        pos_y=75.0,
+        words_per_chunk=2,
+        effect_type="SPRING_BOUNCE",
+    ),
+
     # 10. Boxed Red Accent
     "boxed_red_accent": CaptionStyle(
         name="boxed_red_accent",

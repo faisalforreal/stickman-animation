@@ -334,7 +334,7 @@ def build_ass_subtitles(
 
     dialogue_lines: List[str] = []
 
-    for chunk in chunks:
+    for chunk_idx, chunk in enumerate(chunks):
         words = chunk.words
         if not words:
             continue
@@ -393,13 +393,20 @@ def build_ass_subtitles(
                     text = w.punctuated_word.upper() if style.all_caps else w.punctuated_word
                     if w_idx == idx:
                         # Spring-bounce / pop transform tag
-                        if style.effect_type in ("POP", "SPRING_BOUNCE"):
+                        if style.name == "colorsplosion":
+                            anim = "{\\t(0,90,\\fscx118\\fscy118)\\t(90,180,\\fscx100\\fscy100)}"
+                            palette = ["#FF007F", "#FFE600", "#00F0FF", "#39FF14", "#FF5E00", "#BF00FF"]
+                            cur_highlight = hex_to_ass_color(palette[(chunk_idx * 3 + idx) % len(palette)])
+                        elif style.effect_type in ("POP", "SPRING_BOUNCE"):
                             anim = "{\\t(0,100,\\fscx112\\fscy112)\\t(100,200,\\fscx100\\fscy100)}"
+                            cur_highlight = ass_highlight
                         elif style.effect_type == "GLOW":
                             anim = "{\\blur4\\t(0,150,\\blur8)\\t(150,300,\\blur4)}"
+                            cur_highlight = ass_highlight
                         else:
                             anim = ""
-                        formatted_words.append(f"{anim}{{\\c{ass_highlight}}}{text}{{\\c{ass_primary}}}")
+                            cur_highlight = ass_highlight
+                        formatted_words.append(f"{anim}{{\\c{cur_highlight}}}{text}{{\\c{ass_primary}}}")
                     else:
                         formatted_words.append(text)
 

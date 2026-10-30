@@ -140,6 +140,8 @@ def _generate_gemini_tts(
 
     if not endpoint:
         endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    else:
+        endpoint = endpoint.replace("{model}", model)
 
     # Support either query parameter or x-goog-api-key header
     url = endpoint
@@ -170,9 +172,25 @@ def _generate_gemini_tts(
         }
     }
 
-    resp = requests.post(url, headers=headers, json=payload, timeout=60)
-    if resp.status_code != 200:
-        raise RuntimeError(f"Gemini TTS error ({resp.status_code}): {resp.text}")
+    import time
+    for attempt in range(4):
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        if resp.status_code == 429 and attempt < 3:
+            wait_sec = 25
+            try:
+                err_data = resp.json()
+                for d in err_data.get("error", {}).get("details", []):
+                    if d.get("@type", "").endswith("RetryInfo"):
+                        rd = d.get("retryDelay", "25s")
+                        wait_sec = max(5, int(float(rd.rstrip("s")) + 1))
+            except Exception:
+                pass
+            print(f"[Gemini TTS] Rate limit hit. Waiting {wait_sec}s before retry ({attempt + 1}/3)...")
+            time.sleep(wait_sec)
+            continue
+        elif resp.status_code != 200:
+            raise RuntimeError(f"Gemini TTS error ({resp.status_code}): {resp.text}")
+        break
 
     data = resp.json()
     candidates = data.get("candidates", [])

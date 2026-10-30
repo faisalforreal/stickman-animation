@@ -1,4 +1,4 @@
-"""Copy the single-source library, TTS, and captioning modules into the skill folder, and optionally build the .skill zip.
+"""Copy the single-source library, TTS, captioning, and animation modules into the skill folder, and optionally build the .skill zip.
 
     python tools/sync_skill.py            # sync only
     python tools/sync_skill.py --build    # sync, then write dist/stickman-animation.skill
@@ -17,13 +17,18 @@ def sync():
     scripts.mkdir(parents=True, exist_ok=True)
     src = ROOT / "src" / "stickman_anim"
     
+    # Core library (skill uses stickman_lib.py for single-file import compatibility)
     shutil.copyfile(src / "lib.py", scripts / "stickman_lib.py")
-    shutil.copyfile(src / "tts.py", scripts / "tts.py")
-    shutil.copyfile(src / "captions.py", scripts / "captions.py")
-    shutil.copyfile(src / "presets.py", scripts / "presets.py")
+    
+    # Copy all other module files and data
+    for py_file in src.glob("*.py"):
+        if py_file.name != "lib.py":
+            shutil.copyfile(py_file, scripts / py_file.name)
+            
     if (src / "capcut_presets.json").is_file():
         shutil.copyfile(src / "capcut_presets.json", scripts / "capcut_presets.json")
-    shutil.copyfile(src / "examples" / "pr_review.py", scripts / "example_demo.py")
+    if (src / "examples" / "pr_review.py").is_file():
+        shutil.copyfile(src / "examples" / "pr_review.py", scripts / "example_demo.py")
 
 
 def build():

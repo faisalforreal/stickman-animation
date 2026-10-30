@@ -20,12 +20,12 @@ Order of execution: **A → B → C → E → D → G → F → H → I**.
 - [x] A12. Annotations: Hand-drawn circle, underline, highlight, bracket, curly arrow (`generators.py`)
 - [x] A13. Other assets: UI mockups (browser, phone, terminal, code block) & paper backgrounds (`generators.py`)
 
-## [ ] Phase B: Articulated Characters & Lip-Sync
-- [ ] B1. 2D skeleton rig with forward kinematics & 2-bone analytic IK (`rig.py`)
-- [ ] B2. 12+ named poses/actions: walk, run, wave, point, type, sit, shrug, jump, celebrate, fail, hold, hand-off, think
-- [ ] B3. Facing and flip, prop attach points (hands/head), and accessories (hats, headphones, tie, cape, badge)
-- [ ] B4. Expressions, eye look-at tracking, and audio amplitude-driven mouth movement (lip-sync)
-- [ ] B5. Emotes (`!`, `?`, heart, sweat, zzz), speech bubbles, thought bubbles, and crowds
+## [x] Phase B: Articulated Characters & Lip-Sync
+- [x] B1. 2D skeleton rig with forward kinematics & 2-bone analytic IK (`rig.py`)
+- [x] B2. 12+ named poses/actions: walk, run, wave, point, type, sit, shrug, jump, celebrate, fail, hold, hand-off, think
+- [x] B3. Facing and flip, prop attach points (hands/head), and accessories (hats, headphones, tie, cape, badge)
+- [x] B4. Expressions, eye look-at tracking, and audio amplitude-driven mouth movement (lip-sync)
+- [x] B5. Emotes (`!`, `?`, heart, sweat, zzz), speech bubbles, thought bubbles, and crowds
 
 ## [ ] Phase C: Motion, Easing, Particles & Camera
 - [ ] C1. Easing library: cubic, back overshoot, elastic, bounce, spring, stagger, squash & stretch (`motion.py`)
