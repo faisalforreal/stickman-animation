@@ -8,3 +8,7 @@ dist/
 /out/
 *.mp4
 !docs/**/*.mp4
+
+.env
+.env.local
+.stickman_cache/
