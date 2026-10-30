@@ -39,10 +39,10 @@ Order of execution: **A → B → C → E → D → G → F → H → I**.
 - [x] E2. Multi-speaker dialogue generation with speaker lip-sync routing (`audio_fx.py`)
 - [x] E3. Procedural CC0 sound effects synthesizer (pop, click, whoosh, ding, pen scratch) & BGM auto-ducking + loudnorm
 
-## [ ] Phase D: Multi-Scene Timeline, Caching & Performance
-- [ ] D1. Multi-scene `Timeline` & `project.json` runner with transitions and B-roll/PiP (`timeline.py`)
-- [ ] D2. Hash-based scene render cache (`.stickman_cache/`)
-- [ ] D3. Windows/macOS ThreadPool multiprocessing fix + FFmpeg GPU encoder auto-probe
+## [x] Phase D: Multi-Scene Timeline, Caching & Performance
+- [x] D1. Multi-scene `Timeline` & `project.json` runner with transitions and B-roll/PiP (`timeline.py`)
+- [x] D2. Hash-based scene render cache (`.stickman_cache/`)
+- [x] D3. Windows/macOS ThreadPool multiprocessing fix + FFmpeg GPU encoder auto-probe
 - [ ] D4. Aspect presets (`16:9`, `9:16`, `1:1`) with safe-zone caption placement
 
 ## [ ] Phase G: Agent Layer (Storyboard, Linter, Assets)

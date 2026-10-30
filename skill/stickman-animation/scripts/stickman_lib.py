@@ -54,6 +54,7 @@ from .audio_fx import (
     parse_dialogue_script, generate_dialogue_audio, get_active_speaker_at,
     calculate_rms_envelope, synthesize_sfx, mix_audio_tracks
 )
+from .timeline import Scene, Timeline, run_project_file, ASPECT_PRESETS
 
 
 # ------------------------------------------------------------------ flags
@@ -674,29 +675,65 @@ def _render_one(f):
     return im.size, im.tobytes()
 
 
+_DETECTED_ENCODER = None
+
+
+def _detect_video_encoder():
+    """Detect functional hardware H.264 GPU encoder if available, otherwise fall back to libx264."""
+    global _DETECTED_ENCODER
+    if _DETECTED_ENCODER is not None:
+        return _DETECTED_ENCODER
+    import shutil
+    import subprocess
+    if not shutil.which("ffmpeg"):
+        _DETECTED_ENCODER = "libx264"
+        return _DETECTED_ENCODER
+
+    candidates = ["h264_nvenc", "h264_qsv", "h264_amf", "h264_videotoolbox"]
+    for enc in candidates:
+        cmd = ["ffmpeg", "-y", "-loglevel", "quiet", "-f", "lavfi", "-i", "color=c=black:s=16x16:d=0.1", "-c:v", enc, "-f", "null", "-"]
+        try:
+            res = subprocess.run(cmd, timeout=1.5)
+            if res.returncode == 0:
+                _DETECTED_ENCODER = enc
+                return _DETECTED_ENCODER
+        except Exception:
+            continue
+
+    _DETECTED_ENCODER = "libx264"
+    return _DETECTED_ENCODER
+
+
 def _resolve_workers(workers):
-    import multiprocessing as mp
-    if "fork" not in mp.get_all_start_methods():
-        return 1                                  # Windows / macOS spawn: stay single-process
     if workers in (None, "auto"):
         return max(1, min(_os.cpu_count() or 1, 4))
     return max(1, int(workers))
 
 
 def iter_frames(render, n, workers="auto"):
-    """Yield render(0) .. render(n-1) in order, using up to `workers` processes (fork platforms only).
-    Frames depend only on their number, so the result is identical for any worker count."""
-    workers = _resolve_workers(workers)
-    if workers <= 1 or n < 4:
+    """Yield render(0) .. render(n-1) in order.
+    On non-fork platforms (Windows, macOS), uses ThreadPoolExecutor to achieve multi-core speedup
+    as Pillow C-extensions release the GIL. On fork platforms, uses multiprocessing.Pool."""
+    import multiprocessing as mp
+    from concurrent.futures import ThreadPoolExecutor
+
+    num_workers = _resolve_workers(workers)
+    if num_workers <= 1 or n < 4:
         for f in range(n):
             yield render(f)
         return
-    import multiprocessing as mp
-    global _RENDER
-    _RENDER = render
-    with mp.get_context("fork").Pool(workers) as pool:
-        for size, raw in pool.imap(_render_one, range(n), chunksize=2):
-            yield Image.frombytes("RGB", size, raw)
+
+    if "fork" in mp.get_all_start_methods():
+        global _RENDER
+        _RENDER = render
+        with mp.get_context("fork").Pool(num_workers) as pool:
+            for size, raw in pool.imap(_render_one, range(n), chunksize=2):
+                yield Image.frombytes("RGB", size, raw)
+    else:
+        # High performance threadpool for Windows and macOS
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            for im in executor.map(render, range(n)):
+                yield im
 
 
 def render_mp4(render, n, path, ms=120, crf=14, loops=3, workers="auto"):
@@ -714,10 +751,21 @@ def render_mp4(render, n, path, ms=120, crf=14, loops=3, workers="auto"):
     w, h = first.size
     w2, h2 = w - w % 2, h - h % 2
     tmp = tempfile.mktemp(suffix=".mp4") if loops > 1 else path
+
+    enc = _detect_video_encoder()
+    if enc == "h264_nvenc":
+        enc_args = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", str(crf)]
+    elif enc == "h264_qsv":
+        enc_args = ["-c:v", "h264_qsv", "-global_quality", str(crf)]
+    elif enc == "h264_videotoolbox":
+        enc_args = ["-c:v", "h264_videotoolbox", "-q:v", str(crf * 4)]
+    else:
+        enc_args = ["-c:v", "libx264", "-preset", "slow", "-crf", str(crf)]
+
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (w, h),
            "-framerate", str(round(1000.0 / ms, 3)), "-i", "-",
-           "-vf", "crop=%d:%d:0:0,fps=30" % (w2, h2), "-c:v", "libx264", "-preset", "slow",
-           "-crf", str(crf), "-pix_fmt", "yuv420p", "-movflags", "+faststart", tmp]
+           "-vf", "crop=%d:%d:0:0,fps=30" % (w2, h2)] + enc_args + [
+           "-pix_fmt", "yuv420p", "-movflags", "+faststart", tmp]
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     p.stdin.write(first.convert("RGB").tobytes())
     for im in frames:
