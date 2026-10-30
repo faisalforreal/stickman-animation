@@ -56,10 +56,10 @@ Order of execution: **A → B → C → E → D → G → F → H → I**.
 - [x] F2. Sidecar `.srt` and `.vtt` export
 - [x] F3. Stage collision avoidance & 9:16 safe zones
 
-## [ ] Phase H: Export & Distribution
-- [ ] H1. Social export presets (YouTube, Shorts, Reels, X, LinkedIn), WebM/MOV transparency
-- [ ] H2. Animated SVG exporter (self-contained CSS path animation)
-- [ ] H3. Auto-Thumbnail generator (`<name>_thumb.png`)
+## [x] Phase H: Export & Distribution
+- [x] H1. Social export presets (YouTube, Shorts, Reels, X, LinkedIn), WebM/MOV transparency
+- [x] H2. Animated SVG exporter (self-contained CSS path animation)
+- [x] H3. Auto-Thumbnail generator (`<name>_thumb.png`)
 
 ## [ ] Phase I: Quality, Licenses & Antigravity Sync
 - [ ] I1. Asset license manifest (`LICENSES.md`)

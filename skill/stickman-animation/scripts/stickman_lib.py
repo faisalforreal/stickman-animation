@@ -57,6 +57,7 @@ from .audio_fx import (
 from .timeline import Scene, Timeline, run_project_file, ASPECT_PRESETS
 from .qa import lint_storyboard, search_assets, QAReport, QAIssue
 from .storyboard import render_storyboard, build_storyboard_timeline
+from .exporters import export_social, export_transparent_video, export_animated_svg, generate_thumbnail, SOCIAL_PRESETS
 
 
 # ------------------------------------------------------------------ flags
